@@ -1,0 +1,282 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model BlockedProduct {
+  id        String    @id  // SELF_IMPORT_SEQ
+  prdlstNm  String         // 제품명
+  cmpnyNm   String?        // 제조업체
+  hrmflNm   String?        // 위해성분명
+  ntcnDt    DateTime?      // 통보일자
+  ctryNm    String?        // 원산지
+  imageUrl  String?        // 제품 이미지 URL
+  syncedAt  DateTime
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([ntcnDt(sort: Desc)])
+  @@index([prdlstNm])
+  @@map("blocked_products")
+}
+
+model BlockedIngredient {
+  id            String    @id @default(cuid())
+  rawIrdntNm    String    @unique
+  rawIrdntEngNm String?
+  rawIrdntEtcNm String?
+  appnRelsDvs   Boolean   @default(true)
+  appnDt        DateTime?
+  relsDt        DateTime?
+  appnRsn       String?
+  relsRsn       String?
+  syncedAt      DateTime
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([rawIrdntNm])
+  @@index([rawIrdntEngNm])
+  @@map("blocked_ingredients")
+}
+
+model accounts {
+  id                String  @id
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  users             users   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model bookmarks {
+  id        String   @id
+  userId    String
+  postId    String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId], map: "bookmarks_userid_postid_key")
+  @@index([userId, createdAt(sort: Desc)], map: "bookmarks_userid_createdat_idx")
+}
+
+model comments {
+  id             String     @id
+  postId         String
+  userId         String
+  parentId       String?
+  body           String
+  score          Int        @default(0)
+  depth          Int        @default(0)
+  createdAt      DateTime   @default(now())
+  voteCount      Int        @default(0)
+  reportCount    Int        @default(0)
+  isHidden       Boolean    @default(false)
+  comments       comments?  @relation("commentsTocomments", fields: [parentId], references: [id])
+  other_comments comments[] @relation("commentsTocomments")
+  posts          posts      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  users          users      @relation(fields: [userId], references: [id])
+  reports        reports[]
+}
+
+model disclosures {
+  id              String          @id
+  rceptNo         String          @unique
+  corpCode        String
+  corpName        String
+  reportNm        String
+  reportType      String?
+  submitter       String?
+  rceptDt         DateTime
+  url             String
+  createdAt       DateTime        @default(now())
+  eventClusterId  String?
+  aiExplanation   String?
+  aiExplanationAt DateTime?
+  event_clusters  event_clusters? @relation(fields: [eventClusterId], references: [id])
+
+  @@index([corpCode], map: "disclosures_corpcode_idx")
+  @@index([eventClusterId], map: "disclosures_eventclusterid_idx")
+  @@index([rceptDt(sort: Desc)], map: "disclosures_rceptdt_idx")
+}
+
+model event_clusters {
+  id              String        @id
+  title           String
+  primaryDate     DateTime
+  eventKind       String        @default("disclosure")
+  severity        String        @default("info")
+  companies       String[]      @default([])
+  keywords        String[]      @default([])
+  postCount       Int           @default(0)
+  disclosureCount Int           @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @default(now())
+  disclosures     disclosures[]
+  posts           posts[]
+
+  @@index([primaryDate(sort: Desc)], map: "event_clusters_primarydate_idx")
+  @@index([severity, primaryDate(sort: Desc)], map: "event_clusters_severity_primarydate_idx")
+}
+
+model pharma_corps {
+  id        String   @id
+  corpCode  String   @unique
+  corpName  String
+  stockCode String?
+  category  String   @default("pharma")
+  isActive  Boolean  @default(true)
+  source    String   @default("manual")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  @@index([isActive], map: "pharma_corps_isactive_idx")
+}
+
+model post_tags {
+  postId String
+  tagId  String
+  posts  posts  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tags   tags   @relation(fields: [tagId], references: [id])
+
+  @@id([postId, tagId])
+}
+
+model posts {
+  id                   String          @id
+  userId               String
+  title                String
+  url                  String?
+  urlHash              String?         @unique
+  domain               String?
+  summary              String?         @db.VarChar(150)
+  type                 PostType        @default(link)
+  score                Int             @default(0)
+  commentCount         Int             @default(0)
+  isRss                Boolean         @default(false)
+  rssSourceId          String?
+  createdAt            DateTime        @default(now())
+  aiSummary            String?
+  topicId              String?
+  commentsSummary      String?
+  commentsSummaryAt    DateTime?
+  commentsSummaryCount Int?
+  eventClusterId       String?
+  comments             comments[]
+  post_tags            post_tags[]
+  event_clusters       event_clusters? @relation(fields: [eventClusterId], references: [id])
+  rss_sources          rss_sources?    @relation(fields: [rssSourceId], references: [id])
+  topics               topics?         @relation(fields: [topicId], references: [id])
+  users                users           @relation(fields: [userId], references: [id])
+  votes                votes[]
+
+  @@index([eventClusterId], map: "posts_eventclusterid_idx")
+}
+
+model reports {
+  id        String   @id
+  commentId String
+  userId    String
+  reason    String?
+  createdAt DateTime @default(now())
+  comments  comments @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  users     users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId])
+}
+
+model rss_sources {
+  id          String    @id
+  name        String
+  url         String    @unique
+  category    String?
+  isActive    Boolean   @default(true)
+  lastFetched DateTime?
+  createdAt   DateTime  @default(now())
+  posts       posts[]
+}
+
+model sessions {
+  id           String   @id
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  users        users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model tags {
+  id        String      @id
+  name      String      @unique
+  post_tags post_tags[]
+}
+
+model topics {
+  id        String   @id
+  title     String
+  aiSummary String?
+  postCount Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+  posts     posts[]
+}
+
+model users {
+  id            String     @id
+  email         String     @unique
+  emailVerified DateTime?
+  username      String?    @unique
+  displayName   String?
+  roleLabel     String?
+  karma         Int        @default(0)
+  newsletterYn  Boolean    @default(false)
+  createdAt     DateTime   @default(now())
+  image         String?
+  isAdmin       Boolean    @default(false)
+  authLevel     Int        @default(0)
+  accounts      accounts[]
+  comments      comments[]
+  posts         posts[]
+  reports       reports[]
+  sessions      sessions[]
+  votes         votes[]
+}
+
+model verification_tokens {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model votes {
+  id        String   @id
+  userId    String
+  postId    String?
+  commentId String?
+  value     Int      @default(1)
+  createdAt DateTime @default(now())
+  posts     posts?   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  users     users    @relation(fields: [userId], references: [id])
+
+  @@unique([userId, commentId])
+  @@unique([userId, postId])
+}
+
+enum PostType {
+  link
+  ask
+  rss
+}

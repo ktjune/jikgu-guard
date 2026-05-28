@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+@theme {
+  --color-danger-50: #fff1f1;
+  --color-danger-100: #ffd7d7;
+  --color-danger-500: #ef4444;
+  --color-danger-600: #dc2626;
+  --color-danger-700: #b91c1c;
+
+  --color-safe-50: #f0fdf4;
+  --color-safe-100: #dcfce7;
+  --color-safe-500: #22c55e;
+  --color-safe-600: #16a34a;
+
+  --color-warn-50: #fffbeb;
+  --color-warn-100: #fef3c7;
+  --color-warn-500: #f59e0b;
+  --color-warn-600: #d97706;
+}

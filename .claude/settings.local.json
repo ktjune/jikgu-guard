@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s \"https://data.mfds.go.kr/EZFS01S01\" -H \"User-Agent: Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\)\" --max-time 15)",
+      "WebSearch",
+      "WebFetch(domain:www.data.go.kr)",
+      "WebFetch(domain:www.foodsafetykorea.go.kr)",
+      "WebFetch(domain:apis.data.go.kr)",
+      "WebFetch(domain:data.mfds.go.kr)",
+      "WebFetch(domain:openapi.foodsafetykorea.go.kr)",
+      "Bash(curl -s \"http://openapi.foodsafetykorea.go.kr/api/56c917318b46599e7d2c2287c2d8f484910c76359fc0d33b17186da58694d66d/I2715/json/1/3\")",
+      "Bash(curl -s \"https://api.odcloud.kr/api/15132686/v1/api-docs\" -H \"accept: application/json\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); paths=list\\(d.get\\('paths',{}\\).keys\\(\\)\\); print\\('\\\\n'.join\\(paths\\)\\)\")",
+      "Bash(curl *)",
+      "Bash(npx prisma *)",
+      "Bash(npm install *)",
+      "Bash(cmd *)",
+      "Bash(powershell *)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); scripts=d.get\\('scripts',{}\\); devdeps=d.get\\('devDependencies',{}\\); print\\('scripts:', json.dumps\\(scripts, ensure_ascii=False\\)\\); print\\('vitest:', devdeps.get\\('vitest','없음'\\)\\)\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('prisma version:', d['version']\\)\")",
+      "Bash(npx --no prisma --version)",
+      "Bash(npx prisma@5 --version)",
+      "Bash(node_modules/.bin/prisma --version)",
+      "Bash(npx prisma@5.22.0 validate)",
+      "Bash(DIRECT_URL=\"postgresql://dummy\" DATABASE_URL=\"postgresql://dummy\" npx prisma@5.22.0 generate)",
+      "Bash(npx prisma@5.22.0 generate --schema=prisma/schema.prisma)",
+      "Bash(ls *)",
+      "Bash(node node_modules/prisma/build/index.js --version)",
+      "Bash(node -e \"const {PrismaClient}=require\\('@prisma/client'\\);console.log\\('ok'\\)\")",
+      "Bash(npx vitest *)",
+      "Bash(du *)",
+      "Bash(npx tsc *)",
+      "PowerShell($res = Invoke-WebRequest -Uri \"http://localhost:3000/api/ingredients/search?q=%EC%97%90%ED%8E%98%EB%93%9C%EB%A6%B0&status=all\" -UseBasicParsing; $res.Content | ConvertFrom-Json | ConvertTo-Json -Depth 3)",
+      "PowerShell(try { $res = Invoke-WebRequest -Uri \"http://localhost:3000/api/ingredients/search?q=ephedrine&status=all\" -UseBasicParsing; $res.Content } catch { $_.Exception.Response | ForEach-Object { $stream = $_.GetResponseStream\\(\\); $reader = New-Object System.IO.StreamReader\\($stream\\); $reader.ReadToEnd\\(\\) } })",
+      "PowerShell(Start-Sleep -Seconds 3; try { $res = Invoke-WebRequest -Uri \"http://localhost:3000/api/ingredients/search?q=ephedrine&status=all\" -UseBasicParsing -TimeoutSec 30; $data = $res.Content | ConvertFrom-Json; \"ok=$\\($data.ok\\) total=$\\($data.total\\)\" } catch { \"Error: $\\($_.Exception.Message\\)\" })",
+      "PowerShell(Get-Process -Name \"node\" -ErrorAction SilentlyContinue | Select-Object Id, CPU, @{N='cmd';E={\\(Get-WmiObject Win32_Process -Filter \"ProcessId=$\\($_.Id\\)\"\\).CommandLine}})"
+    ],
+    "defaultMode": "dontAsk"
+  }
+}
