@@ -226,7 +226,14 @@ export default function UnifiedSearch({
     formData.append("image", imageFile!);
     try {
       const res = await fetch("/api/ocr", { method: "POST", body: formData });
-      const data = await res.json();
+      const text = await res.text();
+      let data: { ok: boolean; error?: string; tokens?: string[] };
+      try {
+        data = JSON.parse(text);
+      } catch {
+        // Vercel 타임아웃·서버 오류 시 HTML 반환 → 사용자 친화적 메시지
+        throw new Error("OCR 서버 오류가 발생했습니다. 라벨의 성분표 부분만 잘라서 다시 시도하거나, 성분명을 직접 입력해주세요.");
+      }
       if (!data.ok) throw new Error(data.error);
       const tokens: string[] = data.tokens ?? [];
       if (tokens.length === 0) {

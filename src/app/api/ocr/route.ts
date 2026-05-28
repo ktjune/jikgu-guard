@@ -80,9 +80,17 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true, text, tokens })
   } catch (error) {
-    console.error('[POST /api/ocr] OCR 처리 오류:', error)
+    const msg = error instanceof Error ? error.message : String(error)
+    console.error('[POST /api/ocr] OCR 처리 오류:', msg)
+    // 타임아웃 여부 감지
+    const isTimeout = msg.includes('timeout') || msg.includes('time out') || msg.includes('FUNCTION_INVOCATION_TIMEOUT')
     return NextResponse.json(
-      { ok: false, error: 'OCR 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.' },
+      {
+        ok: false,
+        error: isTimeout
+          ? 'OCR 처리 시간이 초과됐습니다. 성분표 부분만 잘라 찍거나, 성분명을 직접 입력해주세요.'
+          : 'OCR 처리 중 오류가 발생했습니다. 성분명을 직접 입력하거나 구매링크를 사용해주세요.',
+      },
       { status: 500 },
     )
   } finally {
