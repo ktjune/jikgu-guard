@@ -33,9 +33,18 @@ export interface RecentItem {
 
 type AnalysisMode = "ingredient" | "url" | "ocr" | "product";
 
+interface ProductCandidate {
+  id: string;
+  name: string;
+  brand: string;
+  imageUrl: string | null;
+  ingredientsText: string;
+}
+
 type Step =
   | { type: "idle" }
   | { type: "loading"; message: string }
+  | { type: "select"; products: ProductCandidate[]; query: string }
   | {
       type: "done";
       mode: AnalysisMode;
@@ -281,28 +290,34 @@ export default function UnifiedSearch({
 
   // ─── 제품명 검색 fallback ────────────────────────────────────────────
   async function runProductSearch(q: string) {
-    setStep({ type: "loading", message: `제품명 "${q}"으로 성분 검색 중...` });
+    setStep({ type: "loading", message: `"${q}" 제품 검색 중...` });
     try {
       const res = await fetch(`/api/products/search?q=${encodeURIComponent(q)}`);
       const data = await res.json();
       if (!data.ok) throw new Error(data.error);
-      const product = (data.products ?? []).find(
-        (p: { ingredientsText?: string }) => p.ingredientsText
+      const products: ProductCandidate[] = (data.products ?? []).filter(
+        (p: ProductCandidate) => p.ingredientsText
       );
-      if (!product) {
+      if (products.length === 0) {
         setStep({ type: "done", mode: "ingredient", results: [], total: 0 });
         return;
       }
-      const tokens = parseTokens(product.ingredientsText);
-      if (tokens.length === 0) {
-        setStep({ type: "done", mode: "product", productName: product.name, tokens: [], results: [], total: 0 });
-        return;
-      }
-      setStep({ type: "loading", message: `"${product.name}" 성분을 식약처 DB와 대조 중...` });
-      await batchSearch(tokens, product.name, "product");
+      // 제품이 여러 개면 사용자가 선택
+      setStep({ type: "select", products, query: q });
     } catch (err) {
       setStep({ type: "error", message: err instanceof Error ? err.message : "제품 검색 실패" });
     }
+  }
+
+  // ─── 제품 선택 후 성분 분석 ──────────────────────────────────────────
+  async function analyzeProduct(product: ProductCandidate) {
+    const tokens = parseTokens(product.ingredientsText);
+    if (tokens.length === 0) {
+      setStep({ type: "done", mode: "product", productName: product.name, tokens: [], results: [], total: 0 });
+      return;
+    }
+    setStep({ type: "loading", message: `"${product.name}" 성분을 식약처 DB와 대조 중...` });
+    await batchSearch(tokens, product.name, "product");
   }
 
   const isLoading = step.type === "loading";
@@ -451,6 +466,43 @@ export default function UnifiedSearch({
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
           </svg>
           <span className="text-sm font-medium">{step.message}</span>
+        </div>
+      )}
+
+      {/* ── 제품 선택 ── */}
+      {step.type === "select" && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-gray-700">
+              🛒 &quot;{step.query}&quot; 검색 결과 — 분석할 제품을 선택하세요
+            </p>
+            <span className="text-xs text-gray-400">{step.products.length}개</span>
+          </div>
+          <ul className="space-y-2">
+            {step.products.map((p) => (
+              <li key={p.id}>
+                <button
+                  onClick={() => analyzeProduct(p)}
+                  className="w-full text-left flex items-center gap-3 rounded-xl bg-white border border-gray-100 shadow-sm px-4 py-3 hover:border-indigo-300 hover:shadow-md transition-all"
+                >
+                  {p.imageUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={p.imageUrl}
+                      alt={p.name}
+                      className="w-12 h-12 rounded-lg object-contain border border-gray-100 flex-shrink-0 bg-gray-50"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{p.name}</p>
+                    {p.brand && <p className="text-xs text-gray-400 truncate">{p.brand}</p>}
+                  </div>
+                  <span className="text-indigo-500 text-xs font-medium shrink-0">분석 →</span>
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
