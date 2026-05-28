@@ -45,6 +45,7 @@ type Step =
   | { type: "idle" }
   | { type: "loading"; message: string }
   | { type: "select"; products: ProductCandidate[]; query: string }
+  | { type: "notfound"; query: string }
   | {
       type: "done";
       mode: AnalysisMode;
@@ -299,10 +300,10 @@ export default function UnifiedSearch({
         (p: ProductCandidate) => p.ingredientsText
       );
       if (products.length === 0) {
-        setStep({ type: "done", mode: "ingredient", results: [], total: 0 });
+        setStep({ type: "notfound", query: q });
         return;
       }
-      // 제품이 여러 개면 사용자가 선택
+      // 제품 목록 보여주고 사용자가 선택
       setStep({ type: "select", products, query: q });
     } catch (err) {
       setStep({ type: "error", message: err instanceof Error ? err.message : "제품 검색 실패" });
@@ -503,6 +504,44 @@ export default function UnifiedSearch({
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {/* ── 제품 없음 ── */}
+      {step.type === "notfound" && (
+        <div className="rounded-2xl bg-white border border-gray-100 shadow-sm px-6 py-8 text-center space-y-4">
+          <p className="text-4xl">🔍</p>
+          <div className="space-y-1">
+            <p className="font-semibold text-gray-800">
+              &quot;{step.query}&quot; 제품을 찾을 수 없습니다.
+            </p>
+            <p className="text-sm text-gray-500">
+              제품 데이터베이스에 등록되지 않은 제품입니다.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row justify-center gap-3 pt-2">
+            <button
+              onClick={() => {
+                fileInputRef.current?.click();
+                setStep({ type: "idle" });
+              }}
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-indigo-600 text-white px-5 py-2.5 text-sm font-medium hover:bg-indigo-700 transition-colors"
+            >
+              📷 라벨 사진 업로드
+            </button>
+            <button
+              onClick={() => {
+                setQuery("");
+                setStep({ type: "idle" });
+              }}
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-gray-200 text-gray-600 px-5 py-2.5 text-sm font-medium hover:border-indigo-300 hover:text-indigo-600 transition-colors"
+            >
+              🔗 구매링크 붙여넣기
+            </button>
+          </div>
+          <p className="text-xs text-gray-400">
+            iHerb·Amazon 링크 또는 제품 라벨 사진으로 성분을 분석할 수 있습니다.
+          </p>
         </div>
       )}
 
