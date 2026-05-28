@@ -1,15 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { writeFile, unlink } from 'fs/promises'
-import { tmpdir } from 'os'
-import { join } from 'path'
-import { randomUUID } from 'crypto'
-import sharp from 'sharp'
 
-export const maxDuration = 60
+export const maxDuration = 30
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
 
-// 영양제 라벨에서 성분명이 아닐 가능성이 높은 불용어
 const STOPWORDS = new Set([
   'and', 'or', 'with', 'the', 'of', 'in', 'for', 'from', 'by', 'as', 'at',
   'to', 'a', 'an', 'is', 'are', 'not', 'no', 'per', 'other', 'each',
@@ -19,7 +13,6 @@ const STOPWORDS = new Set([
 
 function parseIngredientTokens(text: string): string[] {
   const tokens: string[] = []
-
   for (const line of text.split(/[\n\r]+/)) {
     for (const part of line.split(/[,;·•\/|:]+/)) {
       const cleaned = part
@@ -27,25 +20,30 @@ function parseIngredientTokens(text: string): string[] {
         .replace(/[()[\]{}*#@!?]/g, '')
         .replace(/\s+/g, ' ')
         .trim()
-
       const lower = cleaned.toLowerCase()
-
       if (
-        cleaned.length >= 4 &&          // 최소 4자 이상
+        cleaned.length >= 4 &&
         cleaned.length <= 60 &&
         !STOPWORDS.has(lower) &&
-        !/^\d+$/.test(cleaned) &&        // 숫자만인 경우 제외
-        !/^[\W_]+$/.test(cleaned)        // 특수문자만인 경우 제외
+        !/^\d+$/.test(cleaned) &&
+        !/^[\W_]+$/.test(cleaned)
       ) {
         tokens.push(cleaned)
       }
     }
   }
-
   return [...new Set(tokens)]
 }
 
 export async function POST(request: NextRequest) {
+  const apiKey = process.env.GOOGLE_CLOUD_VISION_API_KEY
+  if (!apiKey) {
+    return NextResponse.json(
+      { ok: false, error: 'Google Cloud Vision API 키가 설정되지 않았습니다.' },
+      { status: 500 },
+    )
+  }
+
   let formData: FormData
   try {
     formData = await request.formData()
@@ -64,36 +62,45 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: '파일 크기는 5MB 이하여야 합니다.' }, { status: 400 })
   }
 
-  const tmpPath = join(tmpdir(), `ocr-${randomUUID()}.png`)
-
   try {
-    const rawBuffer = Buffer.from(await file.arrayBuffer())
+    const buffer = Buffer.from(await file.arrayBuffer())
+    const base64 = buffer.toString('base64')
 
-    // WebP·HEIC 등 어떤 포맷이든 PNG로 변환 (Leptonica 호환)
-    const pngBuffer = await sharp(rawBuffer).png().toBuffer()
-    await writeFile(tmpPath, pngBuffer)
+    const visionRes = await fetch(
+      `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requests: [{
+            image: { content: base64 },
+            features: [{ type: 'TEXT_DETECTION', maxResults: 1 }],
+            imageContext: { languageHints: ['ko', 'en'] },
+          }],
+        }),
+      },
+    )
 
-    const { recognize } = await import('tesseract.js')
-    const { data: { text } } = await recognize(tmpPath, 'kor+eng')
+    if (!visionRes.ok) {
+      const err = await visionRes.json().catch(() => ({}))
+      throw new Error(err?.error?.message ?? `Vision API 오류: ${visionRes.status}`)
+    }
+
+    const visionData = await visionRes.json()
+    const text: string = visionData.responses?.[0]?.textAnnotations?.[0]?.description ?? ''
+
+    if (!text) {
+      return NextResponse.json({ ok: true, text: '', tokens: [] })
+    }
 
     const tokens = parseIngredientTokens(text)
-
     return NextResponse.json({ ok: true, text, tokens })
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error)
-    console.error('[POST /api/ocr] OCR 처리 오류:', msg)
-    // 타임아웃 여부 감지
-    const isTimeout = msg.includes('timeout') || msg.includes('time out') || msg.includes('FUNCTION_INVOCATION_TIMEOUT')
+    console.error('[POST /api/ocr] Vision API 오류:', msg)
     return NextResponse.json(
-      {
-        ok: false,
-        error: isTimeout
-          ? 'OCR 처리 시간이 초과됐습니다. 성분표 부분만 잘라 찍거나, 성분명을 직접 입력해주세요.'
-          : 'OCR 처리 중 오류가 발생했습니다. 성분명을 직접 입력하거나 구매링크를 사용해주세요.',
-      },
+      { ok: false, error: `OCR 처리 오류: ${msg}` },
       { status: 500 },
     )
-  } finally {
-    await unlink(tmpPath).catch(() => {})
   }
 }
